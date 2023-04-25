@@ -55,9 +55,11 @@ def post_request():
     # Insert the new post object into the database
     with lock:
         posts_collection = db["posts_collection"]
-        posts_collection.insert_one(new_post)
+        post = posts_collection.insert_one(new_post)
 
-    return "Post created successfully", 200
+    post_dict = dict(post)
+    post_dict.pop("_id", None)
+    return jsonify(post_dict), 200
 
 
 @app.route("/post/<int:id>", methods=['GET'])
