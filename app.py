@@ -1,5 +1,8 @@
+# pylint: disable=no-member
+from flask import Flask, request, jsonify
 from datetime import datetime
 from pymongo import MongoClient
+from bson import ObjectId
 from threading import Lock
 import secrets
 
@@ -14,13 +17,25 @@ db = client[db_name]
 # Define a lock object to manage access to global state
 lock = Lock()
 
+app = Flask(__name__)
 
-def create_post(msg):
+
+@app.route("/post", methods=['POST'])
+def post_request():
+    body = request.get_json(force=True)
+    msg = body['msg']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
 
     # Generate a new UUID for the post
-    post_id = len(list(db["posts_collection"].find()))
+    max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
+    if max_id_doc is None:
+        max_id = 0
+    else:
+        max_id = max_id_doc["id"]
+
+    # Generate a new post_id by incrementing the maximum post_id
+    post_id = max_id + 1
 
     # Get the current time
     timestamp = datetime.now()
@@ -40,26 +55,13 @@ def create_post(msg):
     # Insert the new post object into the database
     with lock:
         posts_collection = db["posts_collection"]
-        result = posts_collection.insert_one(new_post)
+        posts_collection.insert_one(new_post)
 
-    return result
-
-
-def get_posts():
-    # Get all posts from the database
-    with lock:
-        posts_collection = db["posts_collection"]
-        posts_cursor = posts_collection.find()
-
-    # Convert posts from a cursor to a list
-    posts_list = []
-    for post in posts_cursor:
-        posts_list.append(post)
-
-    return posts_list
+    return "Post created successfully", 200
 
 
-def get_post_by_id(id):
+@app.route("/post/<int:id>", methods=['GET'])
+def get_post(id):
     # Get a post from the database by ID
     with lock:
         posts_collection = db["posts_collection"]
@@ -68,9 +70,12 @@ def get_post_by_id(id):
     if post is None:
         return f"Post with ID: {id} not found", 404
 
-    return post
+    post_dict = dict(post)
+    post_dict.pop("_id", None)
+    return jsonify(post_dict), 200
 
 
+@app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
     # Find the post with the given ID
     with lock:
@@ -91,6 +96,25 @@ def delete_post(id, key):
 
     # Check if the deletion was successful
     if result.deleted_count == 0:
-        return "Error deleting post", 500
+        return "Internal Server Error", 500
 
-    return f"Post with ID: {id} deleted successfully", 200
+    post_dict = dict(post)
+    post_dict.pop("_id", None)
+    return jsonify(post_dict), 200
+
+
+if __name__ == "__main__":
+    app.run()
+
+
+# IGNORE:
+# def get_post_by_id(id):
+#     # Get a post from the database by ID
+#     with lock:
+#         posts_collection = db["posts_collection"]
+#         post = posts_collection.find_one({"id": id})
+
+#     if post is None:
+#         return f"Post with ID: {id} not found", 404
+
+#     return post
