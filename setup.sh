@@ -1,8 +1,8 @@
 #!/bin/bash
 
 echo "├─ Installing dependencies"
-echo "├─ flask"
-pip install flask
+# echo "├─ flask"
+# pip install flask
 echo "├─ pymongo"
 pip install pymongo
 echo "├─ secrets"
