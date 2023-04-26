@@ -89,7 +89,7 @@ def delete_post(id, key):
 
     # Check if the post exists
     if post is None:
-        return "Post not found", 404
+        return f"Post with ID: {id} not found", 404
 
     # Check if the key matches
     if post["key"] != key:
@@ -123,7 +123,7 @@ def update_post(id, key):
 
     # Check if the post exists
     if post is None:
-        return "Post not found", 404
+        return f"Post with ID: {id} not found", 404
 
     # Check if the key matches
     if post["key"] != key:
