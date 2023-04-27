@@ -80,20 +80,6 @@ def get_post(id):
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
 
-@app.route("/key/<int:id>", methods=['GET'])
-def get_key(id):
-    # Get a key from the database by id
-    with lock:
-        posts_collection = db["posts_collection"]
-        post = posts_collection.find_one({"id": id})
-
-    if post is None:
-        return f"Post with ID: {id} not found", 404
-
-    post_dict = dict(post)
-    post_dict.pop("_id", None)
-    return post_dict["key"], 200
-
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
     # Find the post with the given ID
