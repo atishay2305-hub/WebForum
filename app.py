@@ -39,7 +39,8 @@ def post_request():
     post_id = max_id + 1
 
     # Get the current time
-    timestamp = datetime.now()
+    # timestamp = datetime.now()
+    timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # Generate a random key
     key = secrets.token_hex(16)
@@ -79,6 +80,19 @@ def get_post(id):
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
 
+@app.route("/key/<int:id>", methods=['GET'])
+def get_key(id):
+    # Get a key from the database by id
+    with lock:
+        posts_collection = db["posts_collection"]
+        post = posts_collection.find_one({"id": id})
+
+    if post is None:
+        return f"Post with ID: {id} not found", 404
+
+    post_dict = dict(post)
+    post_dict.pop("_id", None)
+    return post_dict["key"], 200
 
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
@@ -134,9 +148,11 @@ def update_post(id, key):
         flag = True
 
     # Update the post message
+    timestamp = datetime.now()
     with lock:
         result = posts_collection.update_one(
             {"id": id}, {"$set": {"msg": msg}})
+        posts_collection.update_one({"id": id}, {"$set": {"timestamp": timestamp}})
 
     # Check if the update was successful
     if result.modified_count == 0 and flag == False:
@@ -155,16 +171,3 @@ def update_post(id, key):
 
 if __name__ == "__main__":
     app.run()
-
-
-# IGNORE:
-# def get_post_by_id(id):
-#     # Get a post from the database by ID
-#     with lock:
-#         posts_collection = db["posts_collection"]
-#         post = posts_collection.find_one({"id": id})
-
-#     if post is None:
-#         return f"Post with ID: {id} not found", 404
-
-#     return post
