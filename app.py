@@ -39,7 +39,6 @@ def post_request():
     post_id = max_id + 1
 
     # Get the current time
-    # timestamp = datetime.now()
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # Generate a random key
@@ -79,6 +78,23 @@ def get_post(id):
     post_dict = dict(post)
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
+
+@app.route("/post/fulltext/<string:msg>", methods=['GET'])
+def get_text(msg):
+    # Get all posts from the database
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_cursor = posts_collection.find()
+
+    # Convert posts from a cursor to a list
+    posts_list = []
+    for post in posts_cursor:
+        post_dict = dict(post)
+        post_dict.pop("_id", None)
+        if post_dict["msg"] == msg:
+            posts_list.append(post_dict)
+
+    return jsonify(posts_list), 200
 
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
@@ -153,7 +169,6 @@ def update_post(id, key):
     else:
         flag = False
         return jsonify(post_dict), 201
-
 
 if __name__ == "__main__":
     app.run()
