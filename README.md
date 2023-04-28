@@ -1,5 +1,6 @@
 # Name + Stevens Login
 Jason Rossi, jrossi3@stevens.edu
+Nouman Syed, nsyed1@stevens.edu
 
 # The URL of your public GitHub repo
 https://github.com/Jrossi3/WebForum
