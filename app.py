@@ -154,7 +154,8 @@ def update_post(id, key):
     with lock:
         result = posts_collection.update_one(
             {"id": id}, {"$set": {"msg": msg}})
-        posts_collection.update_one({"id": id}, {"$set": {"timestamp": timestamp}})
+        posts_collection.update_one(
+            {"id": id}, {"$set": {"timestamp": timestamp}})
 
     # Check if the update was successful
     if result.modified_count == 0 and flag == False:
@@ -172,3 +173,4 @@ def update_post(id, key):
 
 if __name__ == "__main__":
     app.run()
+
