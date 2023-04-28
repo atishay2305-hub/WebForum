@@ -80,6 +80,7 @@ def get_post(id):
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
 
+
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
     # Find the post with the given ID
@@ -138,7 +139,8 @@ def update_post(id, key):
     with lock:
         result = posts_collection.update_one(
             {"id": id}, {"$set": {"msg": msg}})
-        posts_collection.update_one({"id": id}, {"$set": {"timestamp": timestamp}})
+        posts_collection.update_one(
+            {"id": id}, {"$set": {"timestamp": timestamp}})
 
     # Check if the update was successful
     if result.modified_count == 0 and flag == False:
@@ -155,5 +157,23 @@ def update_post(id, key):
         return jsonify(post_dict), 201
 
 
+@app.route("/retrieve", methods=['GET'])
+def get_db():
+    # Get all posts from the database
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_cursor = posts_collection.find()
+
+    # Convert posts from a cursor to a list
+    posts_list = []
+    for post in posts_cursor:
+        post_dict = dict(post)
+        post_dict.pop("_id", None)
+        posts_list.append(post_dict)
+
+    return jsonify(posts_list), 200
+
+
 if __name__ == "__main__":
     app.run()
+
