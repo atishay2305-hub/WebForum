@@ -1,31 +1,150 @@
-#!/bin/sh
+#!/bin/bash
+# echo "├─ pymongo"
+pip3 install pymongo
+# echo "├─ secrets"
+pip3 install secrets
 
-python app.py 
+# Start the app in the background
+python3 app.py &
+PID=$!
 
-# sleep 5
+# Wait for the app to start up
+sleep 2
 
+# Test POST /post and GET /post/id
+# This test will exit immediately if the POST /post or GET /post/id fails.
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
+RESPONSE=$(curl http://localhost:5000/post/1)
+key=$(echo $RESPONSE | jq -r '.key')
+timestamp=$(echo $RESPONSE | jq -r '.timestamp')
+id=$(echo $RESPONSE | jq -r '.id')
 
-set -e # exit immediately if newman complains
-trap 'kill $PID' EXIT # kill the server on exit
+# GET /post/id test
+if [ "$RESPONSE" != "Post with ID: 1 not found" ]; then
+  echo "Get /post/id passed."
+else
+  echo "Get /post/id failed."
+  exit 1
+fi
 
-./run.sh &
-PID=$! # record the PID
+# Check if the response matches the expected output
+# POST /post test
+EXPECTED={'"id"':$id,'"key"':'"'$key'"','"msg"':'"hi my name is jason"','"thread"':[],'"timestamp"':'"'$timestamp'"'}
+if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
+  echo "ERROR: POST /post failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST /post passed"
+fi
 
-# # valid message
-curl -X POST -H "Content-Type: application/json" -d '{"msg": "test message."}' http://127.0.0.1:5000/post
+# Stop the server
+echo "Stopping Flask server..."
+kill $PID
 
-# #invalid message (not a string)
-curl -X POST -H "Content-Type: application/json" -d '{"msg": 123}' http://127.0.0.1:5000/post
+# Start the server again
+echo "Starting Flask server again..."
+flask run &
+PID=$!
 
-# #get
-curl http://localhost:5000/post/1
+# Wait for the app to start up
+sleep 2
 
-#update
-curl -X PUT -d '{"msg": "hello I am update"}' http://127.0.0.1:5000/post/id/update/key
+# Testing persistence to see if the post still exists after restarting the server
+# This test will exit immediately if the persistence fails.
+EXISTS=$(curl http://localhost:5000/post/$id)
 
-python seed.py -m unittest discover -s . -p "app.py"
+if [ "$EXISTS" != "Post with ID: $id not found" ]; then
+  echo "Persistence passed."
+else
+  echo "Persistence failed."
+fi
 
+# Testing persistence for a bad request to see if the post still exists
+# This test will exit immediately if the persistence fails.
+curl asjknfadj
+EXISTS=$(curl http://localhost:5000/post/$id)
 
+if [ "$EXISTS" != "Post with ID: $id not found" ]; then
+  echo "Persistence passed."
+else
+  echo "Persistence failed."
+  exit 1
+fi
 
-# newman run forum_multiple_posts.postman_collection.json -e env.json # use the env file
-# newman run forum_post_read_delete.postman_collection.json -n 50 # 50 iterations
+# Testing the delete function by creating 4 more posts and then deleting all 5 of the posts
+# This test will exit immediately if the deletion fails. 
+counter=2
+while [ $counter -le 5 ]
+do
+  curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
+  ((counter++))
+done
+
+counter=1
+while [ $counter -le 5 ]
+do
+  RESPONSE=$(curl http://localhost:5000/post/$counter)
+  key=$(echo $RESPONSE | jq -r '.key')
+  curl -X DELETE http://127.0.0.1:5000/post/$counter/delete/$key
+  EXISTS=$(curl http://localhost:5000/post/$counter)
+  if [ "$EXISTS" = "Post with ID: $counter not found" ]; then
+    echo "Delete passed."
+  else
+    echo "Delete failed."
+    exit 1
+  fi
+  ((counter++))
+done
+
+# Test the update function
+# This should return "Message updated." Otherwise, the test will exit immediately.
+
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
+RESPONSE=$(curl http://localhost:5000/post/1)
+key=$(echo $RESPONSE | jq -r '.key')
+id=$(echo $RESPONSE | jq -r '.id')
+msg=$(echo $RESPONSE | jq -r '.msg')
+curl -X PUT -d '{"msg": "hello I am update"}' http://127.0.0.1:5000/post/$id/update/$key
+New=$(curl http://localhost:5000/post/1)
+newMsg=$(echo $New | jq -r '.msg')
+
+if [ "$msg" != "$newMsg" ]; then
+  echo "Message updated."
+else
+  echo "Message not updated."
+  exit 1
+fi
+
+# Clean up
+key=$(echo $New | jq -r '.key')
+curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
+
+# Running the same test as before except commenting out the update function to show that the update will not happen
+# This is to show that the update function is actually updating the message
+# This should return "Message not updated." Otherwise, the test will exit immediately.
+
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
+RESPONSE=$(curl http://localhost:5000/post/1)
+key=$(echo $RESPONSE | jq -r '.key')
+id=$(echo $RESPONSE | jq -r '.id')
+msg=$(echo $RESPONSE | jq -r '.msg')
+# curl -X PUT -d '{"msg": "hello I am update"}' http://127.0.0.1:5000/post/$id/update/$key
+New=$(curl http://localhost:5000/post/1)
+newMsg=$(echo $New | jq -r '.msg')
+
+if [ "$msg" != "$newMsg" ]; then
+  echo "Message updated."
+  exit 1
+else
+  echo "Message not updated."
+fi
+
+# Clean up
+key=$(echo $New | jq -r '.key')
+curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
+
+echo "Yay, all of the tests passed!"
+
+kill $PID

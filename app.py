@@ -64,6 +64,58 @@ def post_request():
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
 
+@app.route("/post/<int:post_id>", methods=["POST"])
+def threaded_replies(post_id):
+
+    body = request.get_json(force = True)
+    msg = body['msg']
+    key = body['key']
+    if not isinstance(msg, str) or msg is None:
+        return "Post content should be of type string", 400
+    
+    # Get the parent post object
+    parent_post = db["posts_collection"].find_one({"id": post_id})
+    if parent_post is None:
+        return "Parent post not found", 404
+    
+    if parent_post["key"] != key:
+        return "Key is invalid"
+    
+    # Generate a new UUID for the reply
+    max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
+    if max_id_doc is None:
+        max_id = 0
+    else:
+        max_id = max_id_doc["id"]
+
+    reply_id = max_id + 1
+    timestamp = datetime.now()
+
+    reply = {
+        "id": reply_id,
+        "msg": msg,
+        "key": key,
+        "timestamp": timestamp
+    }
+
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_collection._update({"_id": parent_post["_id"]},
+           {"$push": {"thread": reply}})
+
+    inserted_reply = posts_collection.find_one(
+        {"id": post_id, "thread.id": reply_id},
+        {"_id": 0, "thread.$": 1}
+    )
+
+    return jsonify(inserted_reply["thread"][0]), 200
+
+
+
+
+
+
+
 
 @app.route("/post/<int:id>", methods=['GET'])
 def get_post(id):
