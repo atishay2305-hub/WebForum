@@ -110,12 +110,27 @@ def threaded_replies(post_id):
 
     return jsonify(inserted_reply["thread"][0]), 200
 
+# @app.route("/post/<int:reply_id>", methods=['GET'])
+# def get_thread_queries(reply_id):
+#     #getting thread based range queries
+
+#     with lock:
+#         post_collection = db["posts_collection"]
+#         post = post_collection.find_one({"id": reply_id})
+
+#         if post is None:
+#             return f"Post with ID: {id} not found", 404
+        
+        
+        
 
 
+#         res = []
 
 
+        
 
-
+        
 
 @app.route("/post/<int:id>", methods=['GET'])
 def get_post(id):
