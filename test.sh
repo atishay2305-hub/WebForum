@@ -148,7 +148,8 @@ fi
 key=$(echo $New | jq -r '.key')
 curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
 
-# Write tests for Fulltext search
+# Testing for fulltext search
+# Creating multiple posts and then checking if the fulltext search works on each post
 # This will exit immediately if the fulltext search fails
 curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
 curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
