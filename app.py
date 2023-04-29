@@ -39,7 +39,8 @@ def post_request():
     post_id = max_id + 1
 
     # Get the current time
-    timestamp = datetime.now()
+
+    timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # Generate a random key
     key = secrets.token_hex(16)
@@ -145,6 +146,22 @@ def get_post(id):
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
 
+@app.route("/post/fulltext/<string:msg>", methods=['GET'])
+def get_text(msg):
+    # Get all posts from the database
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_cursor = posts_collection.find()
+
+    # Convert posts from a cursor to a list
+    posts_list = []
+    for post in posts_cursor:
+        post_dict = dict(post)
+        post_dict.pop("_id", None)
+        if post_dict["msg"] == msg:
+            posts_list.append(post_dict)
+
+    return jsonify(posts_list), 200
 
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
@@ -218,36 +235,6 @@ def update_post(id, key):
         flag = False
         return jsonify(post_dict), 201
 
-
-@app.route("/retrieve", methods=['GET'])
-def get_db():
-    # Get all posts from the database
-    with lock:
-        posts_collection = db["posts_collection"]
-        posts_cursor = posts_collection.find()
-
-    # Convert posts from a cursor to a list
-    posts_list = []
-    for post in posts_cursor:
-        post_dict = dict(post)
-        post_dict.pop("_id", None)
-        posts_list.append(post_dict)
-
-    return jsonify(posts_list), 200
-
-
 if __name__ == "__main__":
     app.run()
 
-
-# IGNORE:
-# def get_post_by_id(id):
-#     # Get a post from the database by ID
-#     with lock:
-#         posts_collection = db["posts_collection"]
-#         post = posts_collection.find_one({"id": id})
-
-#     if post is None:
-#         return f"Post with ID: {id} not found", 404
-
-#     return post
