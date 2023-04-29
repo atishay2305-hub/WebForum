@@ -70,7 +70,7 @@ def threaded_replies(id):
 
     body = request.get_json(force=True)
     msg = body['msg']
-    key = body['key']
+    # key = body['key']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
 
@@ -78,9 +78,11 @@ def threaded_replies(id):
     parent_post = db["posts_collection"].find_one({"id": id})
     if parent_post is None:
         return "Parent post not found", 404
+    
+    key = secrets.token_hex(16)
 
-    if parent_post["key"] != key:
-        return "Key is invalid"
+    # if parent_post["key"] != key:
+    #     return "Key is invalid"
 
     # Generate a new UUID for the reply
     max_id = 0
