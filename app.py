@@ -64,30 +64,29 @@ def post_request():
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
 
-@app.route("/post/<int:post_id>", methods=["POST"])
-def threaded_replies(post_id):
 
-    body = request.get_json(force = True)
+@app.route("/post/<int:id>", methods=["POST"])
+def threaded_replies(id):
+
+    body = request.get_json(force=True)
     msg = body['msg']
     key = body['key']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
-    
+
     # Get the parent post object
-    parent_post = db["posts_collection"].find_one({"id": post_id})
+    parent_post = db["posts_collection"].find_one({"id": id})
     if parent_post is None:
         return "Parent post not found", 404
-    
+
     if parent_post["key"] != key:
         return "Key is invalid"
-    
-    # Generate a new UUID for the reply
-    max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
-    if max_id_doc is None:
-        max_id = 0
-    else:
-        max_id = max_id_doc["id"]
 
+    # Generate a new UUID for the reply
+    max_id = 0
+    for thread in parent_post["thread"]:
+        if thread["id"] > max_id:
+            max_id = thread["id"]
     reply_id = max_id + 1
     timestamp = datetime.now()
 
@@ -100,37 +99,35 @@ def threaded_replies(post_id):
 
     with lock:
         posts_collection = db["posts_collection"]
-        posts_collection._update({"_id": parent_post["_id"]},
-           {"$push": {"thread": reply}})
+        posts_collection.update_one({"_id": ObjectId(parent_post["_id"])},
+                                    {"$push": {"thread": reply}})
 
     inserted_reply = posts_collection.find_one(
-        {"id": post_id, "thread.id": reply_id},
+        {"id": id, "thread.id": reply_id},
         {"_id": 0, "thread.$": 1}
     )
 
     return jsonify(inserted_reply["thread"][0]), 200
 
-# @app.route("/post/<int:reply_id>", methods=['GET'])
-# def get_thread_queries(reply_id):
-#     #getting thread based range queries
-
-#     with lock:
-#         post_collection = db["posts_collection"]
-#         post = post_collection.find_one({"id": reply_id})
-
-#         if post is None:
-#             return f"Post with ID: {id} not found", 404
-        
-        
-        
 
 
-#         res = []
+@app.route("/post/<int:id>/thread", methods=['GET'])
+def get_thread_queries(id):
+    # Get the threads of a post from the database by ID
+    with lock:
+        posts_collection = db["posts_collection"]
+        post = posts_collection.find_one({"id": id})
+        threads_in_post = post["thread"]
 
+    if post is None:
+        return f"Post with ID: {id} not found", 404
 
-        
+    threads_list = list(threads_in_post)
+    for thread in threads_list:
+        thread.pop("_id", None)
 
-        
+    return jsonify(threads_list), 200
+
 
 @app.route("/post/<int:id>", methods=['GET'])
 def get_post(id):
