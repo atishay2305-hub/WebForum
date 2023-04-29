@@ -151,25 +151,30 @@ curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
 # Write tests for Fulltext search
 # This will exit immediately if the fulltext search fails
 curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
 RESPONSE=$(curl http://127.0.0.1:5000/post/fulltext/"hi%20my%20name%20is%20jason")
-echo "$RESPONSE"
-key=$(echo $RESPONSE | jq -r '.[0].key')
-timestamp=$(echo $RESPONSE | jq -r '.[0].timestamp')
-id=$(echo $RESPONSE | jq -r '.[0].id')
-thread=$(echo $RESPONSE | jq -r '.[0].thread')
-msg=$(echo $RESPONSE | jq -r '.[0].msg')
-EXPECTED=[{'"id"':$id,'"key"':'"'$key'"','"msg"':'"'$msg'"','"thread"':$thread,'"timestamp"':'"'$timestamp'"'}]
-echo "$EXPECTED"
-
-if [ "$RESPONSE" == "$EXPECTED" ]; then
-  echo "Fulltext search passed."
-else
-  echo "Fulltext search failed."
-  exit 1
-fi
+counter=0
+while [ 1 ]
+do
+  msg=$(echo $RESPONSE | jq -r '.[0].msg')
+  if [ "$msg" != "hi my name is jason" ]; then
+    echo "Fulltext search failed."
+    exit 1
+  fi
+  RESPONSE=$(echo "$RESPONSE" | jq 'del(.[0])')
+  if [ "$RESPONSE" == [] ]; then
+    echo "Fulltext search passed."
+    break
+  fi
+done
 
 # Clean up
 New=$(curl http://localhost:5000/post/1)
+id=$(echo $New | jq -r '.id')
+key=$(echo $New | jq -r '.key')
+curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
+
+New=$(curl http://localhost:5000/post/2)
 id=$(echo $New | jq -r '.id')
 key=$(echo $New | jq -r '.key')
 curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
