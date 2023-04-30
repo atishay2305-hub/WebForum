@@ -1,8 +1,8 @@
 #!/bin/bash
 # echo "├─ pymongo"
-pip3 install pymongo
+# pip3 install pymongo
 # echo "├─ secrets"
-pip3 install secrets
+# pip3 install secrets
 
 # Start the app in the background
 python3 app.py &

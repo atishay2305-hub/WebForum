@@ -39,6 +39,7 @@ def post_request():
     post_id = max_id + 1
 
     # Get the current time
+
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # Generate a random key
@@ -63,6 +64,72 @@ def post_request():
     post_dict = dict(inserted_post)
     post_dict.pop("_id", None)
     return jsonify(post_dict), 200
+
+
+@app.route("/post/<int:id>", methods=["POST"])
+def threaded_replies(id):
+
+    body = request.get_json(force=True)
+    msg = body['msg']
+    # key = body['key']
+    if not isinstance(msg, str) or msg is None:
+        return "Post content should be of type string", 400
+
+    # Get the parent post object
+    parent_post = db["posts_collection"].find_one({"id": id})
+    if parent_post is None:
+        return "Parent post not found", 404
+    
+    key = secrets.token_hex(16)
+
+    # if parent_post["key"] != key:
+    #     return "Key is invalid"
+
+    # Generate a new UUID for the reply
+    max_id = 0
+    for thread in parent_post["thread"]:
+        if thread["id"] > max_id:
+            max_id = thread["id"]
+    reply_id = max_id + 1
+    timestamp = datetime.now()
+
+    reply = {
+        "id": reply_id,
+        "msg": msg,
+        "key": key,
+        "timestamp": timestamp
+    }
+
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_collection.update_one({"_id": ObjectId(parent_post["_id"])},
+                                    {"$push": {"thread": reply}})
+
+    inserted_reply = posts_collection.find_one(
+        {"id": id, "thread.id": reply_id},
+        {"_id": 0, "thread.$": 1}
+    )
+
+    return jsonify(inserted_reply["thread"][0]), 200
+
+
+
+@app.route("/post/<int:id>/thread", methods=['GET'])
+def get_thread_queries(id):
+    # Get the threads of a post from the database by ID
+    with lock:
+        posts_collection = db["posts_collection"]
+        post = posts_collection.find_one({"id": id})
+        threads_in_post = post["thread"]
+
+    if post is None:
+        return f"Post with ID: {id} not found", 404
+
+    threads_list = list(threads_in_post)
+    for thread in threads_list:
+        thread.pop("_id", None)
+
+    return jsonify(threads_list), 200
 
 
 @app.route("/post/<int:id>", methods=['GET'])
@@ -150,12 +217,9 @@ def update_post(id, key):
         flag = True
 
     # Update the post message
-    timestamp = datetime.now()
     with lock:
         result = posts_collection.update_one(
             {"id": id}, {"$set": {"msg": msg}})
-        posts_collection.update_one(
-            {"id": id}, {"$set": {"timestamp": timestamp}})
 
     # Check if the update was successful
     if result.modified_count == 0 and flag == False:

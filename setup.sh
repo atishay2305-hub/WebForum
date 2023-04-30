@@ -12,4 +12,6 @@ pip install secrets
 # pip3 install pymongo
 # pip3 install secrets
 
+#TODO: install jq 
+
 echo "└─ Dependencies successfully installed!"
