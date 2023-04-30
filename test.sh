@@ -15,14 +15,15 @@ sleep 2
 
 # Test POST /post and GET /post/id
 # This test will exit immediately if the POST /post or GET /post/id fails.
-curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
-RESPONSE=$(curl http://localhost:5000/post/1)
+RESPONSE=$(curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}')
+echo "$RESPONSE"
 key=$(echo $RESPONSE | jq -r '.key')
 timestamp=$(echo $RESPONSE | jq -r '.timestamp')
 id=$(echo $RESPONSE | jq -r '.id')
 
+TEST=$(curl http://127.0.0.1:5000/post/1)
 # GET /post/id test
-if [ "$RESPONSE" == "Post with ID: 1 not found" ]; then
+if [ "$TEST" == "Post with ID: {$id} not found" ]; then
   echo "Get /post/id failed."
   exit 1
 else
@@ -31,7 +32,7 @@ fi
 
 # Check if the response matches the expected output
 # POST /post test
-EXPECTED={'"id"':$id,'"key"':'"'$key'"','"msg"':'"hi my name is jason"','"thread"':[],'"timestamp"':'"'$timestamp'"'}
+EXPECTED={'"id"':$id,'"key"':'"'$key'"','"timestamp"':'"'$timestamp'"'}
 if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
   echo "ERROR: POST /post failed"
   echo "Expected: $EXPECTED"
@@ -77,22 +78,16 @@ else
 fi
 
 # Testing the delete function by creating 4 more posts and then deleting all 5 of the posts
-# This test will exit immediately if the deletion fails. 
-counter=2
-while [ $counter -le 5 ]
-do
-  curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
-  ((counter++))
-done
-
+# This test will exit immediately if the deletion fails.
 counter=1
 while [ $counter -le 5 ]
 do
-  RESPONSE=$(curl http://localhost:5000/post/$counter)
+  RESPONSE=$(curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}')
   key=$(echo $RESPONSE | jq -r '.key')
-  curl -X DELETE http://127.0.0.1:5000/post/$counter/delete/$key
-  EXISTS=$(curl http://localhost:5000/post/$counter)
-  if [ "$EXISTS" = "Post with ID: $counter not found" ]; then
+  id=$(echo $RESPONSE | jq -r '.id')
+  curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
+  EXISTS=$(curl http://localhost:5000/post/$id)
+  if [ "$EXISTS" = "Post with ID: $id not found" ]; then
     echo "Delete passed."
   else
     echo "Delete failed."
@@ -103,15 +98,14 @@ done
 
 # Test the update function
 # This should return "Message updated." Otherwise, the test will exit immediately.
-
-curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
-RESPONSE=$(curl http://localhost:5000/post/1)
+RESPONSE=$(curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}')
+Old_post=$(curl http://localhost:5000/post/$id)
 key=$(echo $RESPONSE | jq -r '.key')
 id=$(echo $RESPONSE | jq -r '.id')
-msg=$(echo $RESPONSE | jq -r '.msg')
+msg=$(echo $Old_post | jq -r '.msg')
 curl -X PUT -d '{"msg": "hello I am update"}' http://127.0.0.1:5000/post/$id/update/$key
-New=$(curl http://localhost:5000/post/1)
-newMsg=$(echo $New | jq -r '.msg')
+New_post=$(curl http://localhost:5000/post/$id)
+newMsg=$(echo $New_post | jq -r '.msg')
 
 if [ "$msg" == "$newMsg" ]; then
   echo "Message update failed."
@@ -120,32 +114,28 @@ else
   echo "Message update passed."
 fi
 
-# Clean up
-key=$(echo $New | jq -r '.key')
 curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
 
 # Running the same test as before except commenting out the update function to show that the update will not happen
 # This is to show that the update function is actually updating the message
-# This should return "Message not updated." Otherwise, the test will exit immediately.
+# This should return "Message update failed." Otherwise, the test will exit immediately.
 
-curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}'
-RESPONSE=$(curl http://localhost:5000/post/1)
+RESPONSE=$(curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}')
+Old_post=$(curl http://localhost:5000/post/$id)
 key=$(echo $RESPONSE | jq -r '.key')
 id=$(echo $RESPONSE | jq -r '.id')
-msg=$(echo $RESPONSE | jq -r '.msg')
+msg=$(echo $Old_post | jq -r '.msg')
 # curl -X PUT -d '{"msg": "hello I am update"}' http://127.0.0.1:5000/post/$id/update/$key
-New=$(curl http://localhost:5000/post/1)
-newMsg=$(echo $New | jq -r '.msg')
+New_post=$(curl http://localhost:5000/post/$id)
+newMsg=$(echo $New_post | jq -r '.msg')
 
-if [ "$msg" != "$newMsg" ]; then
-  echo "Message updated."
-  exit 1
+if [ "$msg" == "$newMsg" ]; then
+  echo "Message update failed."
 else
-  echo "Message not updated."
+  echo "Message update passed."
+  exit 1
 fi
 
-# Clean up
-key=$(echo $New | jq -r '.key')
 curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
 
 # Testing for fulltext search
@@ -170,15 +160,11 @@ do
 done
 
 # Clean up
-New=$(curl http://localhost:5000/post/1)
-id=$(echo $New | jq -r '.id')
-key=$(echo $New | jq -r '.key')
-curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
-
-New=$(curl http://localhost:5000/post/2)
-id=$(echo $New | jq -r '.id')
-key=$(echo $New | jq -r '.key')
-curl -X DELETE http://127.0.0.1:5000/post/$id/delete/$key
+DB_NAME="web_forum_database"
+mongo <<EOF
+use ${DB_NAME}
+db.dropDatabase()
+EOF
 
 echo "Yay, all of the tests passed!"
 

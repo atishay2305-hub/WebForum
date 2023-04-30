@@ -39,6 +39,7 @@ def post_request():
     post_id = max_id + 1
 
     # Get the current time
+
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # Generate a random key
@@ -62,6 +63,8 @@ def post_request():
 
     post_dict = dict(inserted_post)
     post_dict.pop("_id", None)
+    post_dict.pop("msg", None)
+    post_dict.pop("thread", None)
     return jsonify(post_dict), 200
 
 
@@ -77,6 +80,7 @@ def get_post(id):
 
     post_dict = dict(post)
     post_dict.pop("_id", None)
+    post_dict.pop("key", None)
     return jsonify(post_dict), 200
 
 @app.route("/post/fulltext/<string:msg>", methods=['GET'])
@@ -90,6 +94,7 @@ def get_text(msg):
     posts_list = []
     for post in posts_cursor:
         post_dict = dict(post)
+        post_dict.pop("key", None)
         post_dict.pop("_id", None)
         if post_dict["msg"] == msg:
             posts_list.append(post_dict)
@@ -150,12 +155,9 @@ def update_post(id, key):
         flag = True
 
     # Update the post message
-    timestamp = datetime.now()
     with lock:
         result = posts_collection.update_one(
             {"id": id}, {"$set": {"msg": msg}})
-        posts_collection.update_one(
-            {"id": id}, {"$set": {"timestamp": timestamp}})
 
     # Check if the update was successful
     if result.modified_count == 0 and flag == False:
@@ -165,12 +167,13 @@ def update_post(id, key):
 
     post_dict = dict(updated_post)
     post_dict.pop("_id", None)
+    post_dict.pop("key", None)
     if flag == False:
         return jsonify(post_dict), 200
     else:
         flag = False
         return jsonify(post_dict), 201
 
+
 if __name__ == "__main__":
     app.run()
-
