@@ -1,17 +1,14 @@
 #!/bin/bash
 
 echo "├─ Installing dependencies"
-# echo "├─ flask"
-# pip install flask
-echo "├─ pymongo"
-pip install pymongo
-echo "├─ secrets"
-pip install secrets
-# idk if we should use pip or pip3, or just do both
-# pip3 install flask
-# pip3 install pymongo
-# pip3 install secrets
-
-#TODO: install jq 
+apt-get update
+pip3 install pymongo
+apt-get install apt-utils -y
+apt-get install libldap2-dev -y
+apt-get install libsasl2-dev -y
+pip3 install pyopenssl
+pip3 install --upgrade setuptools wheel
+pip3 install python-ldap
+pip3 install secrets
 
 echo "└─ Dependencies successfully installed!"
