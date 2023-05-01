@@ -1,8 +1,31 @@
 #!/bin/bash
-# echo "├─ pymongo"
-# pip3 install pymongo
-# echo "├─ secrets"
-# pip3 install secrets
+# apt-get install gnupg
+# curl -fsSL https://pgp.mongodb.com/server-6.0.asc | \
+#    gpg -o /usr/share/keyrings/mongodb-server-6.0.gpg \
+#    --dearmor
+# echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+# apt-get update
+# apt-get install -y mongodb-org
+# echo "mongodb-org hold" | dpkg --set-selections
+# echo "mongodb-org-database hold" | dpkg --set-selections
+# echo "mongodb-org-server hold" | dpkg --set-selections
+# echo "mongodb-mongosh hold" | dpkg --set-selections
+# echo "mongodb-org-mongos hold" | dpkg --set-selections
+# echo "mongodb-org-tools hold" | dpkg --set-selections
+pip3 install pymongo
+# apt-get install apt-utils -y
+# apt-get install libldap2-dev -y
+# apt-get install libsasl2-dev -y
+# apt-get install jq -y
+# apt-get install gcc -y
+pip3 install pyopenssl
+# pip3 install --upgrade setuptools wheel
+# pip3 install python-ldap
+pip3 install secrets
+# apt-get install mongodb
+# which mongod
+# service mongod start
+# sleep 5
 
 # Start the app in the background
 python3 app.py &
@@ -16,7 +39,6 @@ sleep 2
 # Test POST /post and GET /post/id
 # This test will exit immediately if the POST /post or GET /post/id fails.
 RESPONSE=$(curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is jason"}')
-echo "$RESPONSE"
 key=$(echo $RESPONSE | jq -r '.key')
 timestamp=$(echo $RESPONSE | jq -r '.timestamp')
 id=$(echo $RESPONSE | jq -r '.id')
@@ -33,7 +55,7 @@ fi
 # Check if the response matches the expected output
 # POST /post test
 EXPECTED={'"id"':$id,'"key"':'"'$key'"','"timestamp"':'"'$timestamp'"'}
-if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
+if [ "$RESPONSE" != "$EXPECTED" ]; then
   echo "ERROR: POST /post failed"
   echo "Expected: $EXPECTED"
   echo "Actual:   $RESPONSE"
@@ -158,6 +180,141 @@ do
     break
   fi
 done
+
+# Clean up
+DB_NAME="web_forum_database"
+mongo <<EOF
+use ${DB_NAME}
+db.dropDatabase()
+EOF
+
+#threaded replies
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "hi my name is Atishay"}'
+curl http://127.0.0.1:5000/post/1 -X POST -d '{"msg": "I am the reply"}'
+RESPONSE=$(curl http://127.0.0.1:5000/post/1)
+id=$(echo $RESPONSE | jq -r '.id')
+msg=$(echo $RESPONSE | jq -r '.msg')
+thread=$(echo $RESPONSE | jq -r '.thread')
+timestamp=$(echo $RESPONSE | jq -r '.timestamp')
+EXPECTED={'"id"':$id,'"msg"':'"'$msg'"','"thread":[2],"timestamp"':'"'$timestamp'"'}
+if [ "$RESPONSE" != "$EXPECTED" ]; then
+  echo "ERROR: POST /post/id failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST thread /post passed"
+fi
+curl http://127.0.0.1:5000/post/1 -X POST -d '{"msg": "I am the second reply"}'
+RESPONSE=$(curl http://127.0.0.1:5000/post/1)
+key=$(echo $RESPONSE | jq -r '.key')
+id=$(echo $RESPONSE | jq -r '.id')
+msg=$(echo $RESPONSE | jq -r '.msg')
+thread=$(echo $RESPONSE | jq -r '.thread')
+timestamp=$(echo $RESPONSE | jq -r '.timestamp')
+EXPECTED={'"id"':$id,'"msg"':'"'$msg'"','"thread":[2,3],"timestamp"':'"'$timestamp'"'}
+if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
+  echo "ERROR: POST /post/id failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST thread /post passed"
+fi
+
+# Clean up
+DB_NAME="web_forum_database"
+mongo <<EOF
+use ${DB_NAME}
+db.dropDatabase()
+EOF
+
+#datetime 
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "First Post"}'
+RESPONSE1=$(curl http://127.0.0.1:5000/post/1)
+key1=$(echo $RESPONSE1 | jq -r '.key')
+id1=$(echo $RESPONSE1 | jq -r '.id')
+msg1=$(echo $RESPONSE1 | jq -r '.msg')
+thread1=$(echo $RESPONSE1 | jq -r '.thread')
+timestamp1=$(echo $RESPONSE1 | jq -r '.timestamp')
+
+sleep 1
+
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "Second Post"}'
+RESPONSE2=$(curl http://127.0.0.1:5000/post/2)
+key2=$(echo $RESPONSE2 | jq -r '.key')
+id2=$(echo $RESPONSE2 | jq -r '.id')
+msg2=$(echo $RESPONSE2 | jq -r '.msg')
+thread2=$(echo $RESPONSE2 | jq -r '.thread')
+timestamp2=$(echo $RESPONSE2 | jq -r '.timestamp')
+
+sleep 1
+
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "Third Post"}'
+RESPONSE3=$(curl http://127.0.0.1:5000/post/3)
+key3=$(echo $RESPONSE3 | jq -r '.key')
+id3=$(echo $RESPONSE3 | jq -r '.id')
+msg3=$(echo $RESPONSE3 | jq -r '.msg')
+thread3=$(echo $RESPONSE3 | jq -r '.thread')
+timestamp3=$(echo $RESPONSE3 | jq -r '.timestamp')
+
+sleep 1
+
+curl http://127.0.0.1:5000/post -X POST -d '{"msg": "Fourth Post"}'
+RESPONSE4=$(curl http://127.0.0.1:5000/post/4)
+key4=$(echo $RESPONSE4 | jq -r '.key')
+id4=$(echo $RESPONSE4 | jq -r '.id')
+msg4=$(echo $RESPONSE4 | jq -r '.msg')
+thread4=$(echo $RESPONSE4 | jq -r '.thread')
+timestamp4=$(echo $RESPONSE4 | jq -r '.timestamp')
+
+sleep 1
+
+EXPECTED='[{"id":1,"msg":"First Post","thread":[],"timestamp":"'$timestamp1'"},{"id":2,"msg":"Second Post","thread":[],"timestamp":"'$timestamp2'"},{"id":3,"msg":"Third Post","thread":[],"timestamp":"'$timestamp3'"},{"id":4,"msg":"Fourth Post","thread":[],"timestamp":"'$timestamp4'"}]'
+RESPONSE=$(curl http://127.0.0.1:5000/post/$timestamp1/$timestamp4)
+if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
+  echo "ERROR: POST /post/start/end failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST /post passed"
+fi
+
+EXPECTED='[{"id":2,"msg":"Second Post","thread":[],"timestamp":"'$timestamp2'"},{"id":3,"msg":"Third Post","thread":[],"timestamp":"'$timestamp3'"},{"id":4,"msg":"Fourth Post","thread":[],"timestamp":"'$timestamp4'"}]'
+RESPONSE=$(curl http://127.0.0.1:5000/post/$timestamp2/none)
+if [ "$RESPONSE" != "$EXPECTED" ]; then
+  echo "ERROR: POST /post/start/end failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST /post passed"
+fi
+
+EXPECTED='[{"id":1,"msg":"First Post","thread":[],"timestamp":"'$timestamp1'"},{"id":2,"msg":"Second Post","thread":[],"timestamp":"'$timestamp2'"},{"id":3,"msg":"Third Post","thread":[],"timestamp":"'$timestamp3'"}]'
+RESPONSE=$(curl http://127.0.0.1:5000/post/none/$timestamp3)
+if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
+  echo "ERROR: POST /post/start/end failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST /post passed"
+fi
+
+echo "fourth"
+
+EXPECTED='Both Start and End cannot be None'
+RESPONSE=$(curl http://127.0.0.1:5000/post/none/none)
+if [[ "$RESPONSE" != *"$EXPECTED"* ]]; then
+  echo "ERROR: POST /post/start/end failed"
+  echo "Expected: $EXPECTED"
+  echo "Actual:   $RESPONSE"
+  exit 1
+else
+  echo "POST /post passed"
+fi
 
 # Clean up
 DB_NAME="web_forum_database"
