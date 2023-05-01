@@ -68,72 +68,6 @@ def post_request():
     return jsonify(post_dict), 200
 
 
-@app.route("/post/<int:id>", methods=["POST"])
-def threaded_replies(id):
-
-    body = request.get_json(force=True)
-    msg = body['msg']
-    # key = body['key']
-    if not isinstance(msg, str) or msg is None:
-        return "Post content should be of type string", 400
-
-    # Get the parent post object
-    parent_post = db["posts_collection"].find_one({"id": id})
-    if parent_post is None:
-        return "Parent post not found", 404
-    
-    key = secrets.token_hex(16)
-
-    # if parent_post["key"] != key:
-    #     return "Key is invalid"
-
-    # Generate a new UUID for the reply
-    max_id = 0
-    for thread in parent_post["thread"]:
-        if thread["id"] > max_id:
-            max_id = thread["id"]
-    reply_id = max_id + 1
-    timestamp = datetime.now()
-
-    reply = {
-        "id": reply_id,
-        "msg": msg,
-        "key": key,
-        "timestamp": timestamp
-    }
-
-    with lock:
-        posts_collection = db["posts_collection"]
-        posts_collection.update_one({"_id": ObjectId(parent_post["_id"])},
-                                    {"$push": {"thread": reply}})
-
-    inserted_reply = posts_collection.find_one(
-        {"id": id, "thread.id": reply_id},
-        {"_id": 0, "thread.$": 1}
-    )
-
-    return jsonify(inserted_reply["thread"][0]), 200
-
-
-
-@app.route("/post/<int:id>/thread", methods=['GET'])
-def get_thread_queries(id):
-    # Get the threads of a post from the database by ID
-    with lock:
-        posts_collection = db["posts_collection"]
-        post = posts_collection.find_one({"id": id})
-        threads_in_post = post["thread"]
-
-    if post is None:
-        return f"Post with ID: {id} not found", 404
-
-    threads_list = list(threads_in_post)
-    for thread in threads_list:
-        thread.pop("_id", None)
-
-    return jsonify(threads_list), 200
-
-
 @app.route("/post/<int:id>", methods=['GET'])
 def get_post(id):
     # Get a post from the database by ID
@@ -240,6 +174,92 @@ def update_post(id, key):
         flag = False
         return jsonify(post_dict), 201
 
+@app.route("/post/<int:id>", methods=["POST"])
+def threaded_replies(id):
+    body = request.get_json(force=True)
+    msg = body['msg']
+    if not isinstance(msg, str) or msg is None:
+        return "Post content should be of type string", 400
+    
+    key = secrets.token_hex(16)
+    # parent_post = db["posts_collection"].find_one({"id": id})
+    # if parent_post is None:
+    #     return "Parent post not found", 404
+        
+    
+
+    # # Generate a new reply id
+    # max_reply_id = parent_post.get("max_reply_id", 0)
+    # reply_id = max_reply_id + 1
+    timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        # Generate a new UUID for the post
+    max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
+    if max_id_doc is None:
+        max_id = 0
+    else:
+        max_id = max_id_doc["id"]
+
+    # Generate a new post_id by incrementing the maximum post_id
+    reply_id = max_id + 1
+    
+
+    reply = {
+        "id": reply_id,
+        "msg": msg,
+        "key": key,
+        "timestamp": timestamp,
+        # "parent_id": parent_post["id"],
+        "thread": []
+    }
+    # Insert the new post object into the database
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_collection.insert_one(reply)
+
+    with lock:
+        posts_collection = db["posts_collection"]
+        posts_collection.update_one(
+            {"id": id},
+            {"$push": {"thread": reply_id}}
+        )
+
+    inserted_post = posts_collection.find_one({"id": reply_id})
+
+    post_dict = dict(inserted_post)
+    post_dict.pop("_id", None)
+    post_dict.pop("key", None)
+    post_dict.pop("thread", None)
+    return jsonify(post_dict), 200
+
+    # return jsonify(reply), 200
+
+@app.route("/post/<string:start>/<string:end>", methods=['GET'])
+def date_time_queries(start, end):
+    if start.lower() == "none":
+        start = start.lower()
+    if end.lower() == "none":
+        end = end.lower()
+    # print(end)
+    timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    with lock:
+        posts_collection = db["posts_collection"]
+        if start == "none" and end == "none":
+            return "Both Start and End cannot be None", 404
+        elif start == "none":
+            posts = posts_collection.find({"timestamp": {"$lte": end}})
+        elif end == "none":
+            posts = posts_collection.find({"timestamp": {"$gte": start}})
+        else:
+            posts = posts_collection.find({"timestamp": {"$gte": start, "$lte": end}})
+
+    result = []
+    for post in posts:
+        post_dict = dict(post)
+        post_dict.pop("_id", None)
+        post_dict.pop("key", None)
+        result.append(post_dict)
+
+    return jsonify(result), 200
 
 if __name__ == "__main__":
     app.run()
