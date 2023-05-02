@@ -28,6 +28,12 @@ This is the route used for the fulltext search feature: @app.route("/post/fullte
 3) Persistence
 No endpoints, used a mongo database to keep track of everything. 
 
+4) Threaded replies
+This is a route used for creating threaded replies in posts: @app.route("/post/<int:id>", methods=["POST"])
+
+5) Date-time based range queries
+This is a route used for finding posts between two given timestamps: @app.route("/post/<string:start>/<string:end>", methods=['GET'])
+
 # detailed summaries of your tests for each of your extensions, i.e., how to interpret your testing framework and the tests you’ve written
 
 1) Update Post
