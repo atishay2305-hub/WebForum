@@ -22,7 +22,7 @@ pip3 install pymongo
 # apt-get install apt-utils -y
 # apt-get install libldap2-dev -y
 # apt-get install libsasl2-dev -y
-# apt-get install jq -y
+apt-get install jq -y
 # apt-get install gcc -y
 pip3 install pyopenssl
 # pip3 install --upgrade setuptools wheel
