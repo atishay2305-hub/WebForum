@@ -46,6 +46,6 @@ We tested persistence through 2 different ways. Our first way was restarting the
 
 We tested threaded replies for which we have send a POST request to the URL with an 'id' parameter and a JSON object containing a 'msg' field. For testing we first created a command just to generate a new post, using the command: "curl http://127.0.0.1:5000/post" and gave the msg as "First". Now that we have the first post available, our job is to now add threaded replies inside of this 1st post. The exact command is "curl http://127.0.0.1:5000/post/1" in which we gave a msg "First Reply".When then check if the threaded reply gets inserted inside of the thread array or not.it should finally generate a reply id, a msg, and timestamp when returning. 
 
-5) Date based range queries
+5) Date-time based range queries
 
 We tested date based range queries by running: curl "http://127.0.0.1:5000/post/2023-04-30T21:13:52Z/2023-04-30T21:13:44Z" for example. Here the two parameters after /post are start and end timestamps. They result with posts in between the two timestamps. We have added three more cases for this. First case if the user wants to give the start timestamp as none, second in which the end time is none and the third one in which both are none. The program will handle the first two out of three but for the third one in which both are entered as none, then it would just give a 404 and throw an error.
