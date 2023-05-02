@@ -24,19 +24,18 @@ app = Flask(__name__)
 # Endpoint 1: Create post
 @app.route("/post", methods=["POST"])
 def post_request():
-    if not request.is_json:
-        return "Request body should be in JSON format", 400
+    # if not request.is_json:
+    #     return "Request body should be in JSON format", 400
     
     body = request.get_json(force=True)
-    if "msg" not in body:
-        return "Request body should have a field called 'msg'", 400
+    # if "msg" not in body:
+    #     return "Request body should have a field called 'msg'", 400
     
     msg = body['msg']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
-  
 
-    # Generate a new ID for the post
+    # Generate a new UUID for the post
     max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
     if max_id_doc is None:
         max_id = 0
@@ -112,8 +111,6 @@ def get_text(msg):
 
     return jsonify(posts_list), 200
 
-
-# Extension 3: Delete post
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
     # Find the post with the given ID
@@ -146,13 +143,7 @@ def delete_post(id, key):
 @app.route("/post/<int:id>/update/<string:key>", methods=["PUT"])
 def update_post(id, key):
     global flag
-    if not request.is_json:
-        return "Request body should be in JSON format", 400
-    
-    body = request.get_json()
-    if "msg" not in body:
-        return "Request body should have a field called 'msg'", 400
-    
+    body = request.get_json(force=True)
     msg = body['msg']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
