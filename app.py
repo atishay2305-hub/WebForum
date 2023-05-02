@@ -24,10 +24,17 @@ app = Flask(__name__)
 # Endpoint 1: Create post
 @app.route("/post", methods=["POST"])
 def post_request():
+    if not request.is_json:
+        return "Request body should be in JSON format", 400
+    
     body = request.get_json(force=True)
+    if "msg" not in body:
+        return "Request body should have a field called 'msg'", 400
+    
     msg = body['msg']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
+  
 
     # Generate a new ID for the post
     max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
@@ -40,6 +47,7 @@ def post_request():
     post_id = max_id + 1
 
     # Get the current time
+
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # Generate a random key
@@ -84,6 +92,8 @@ def get_post(id):
     post_dict.pop("key", None)
     return jsonify(post_dict), 200
 
+
+# Extension 1: Fulltext search
 @app.route("/post/fulltext/<string:msg>", methods=['GET'])
 def get_text(msg):
     # Get all posts from the database
@@ -103,7 +113,7 @@ def get_text(msg):
     return jsonify(posts_list), 200
 
 
-# Endpoint 3: Delete post
+# Extension 3: Delete post
 @app.route("/post/<int:id>/delete/<string:key>", methods=["DELETE"])
 def delete_post(id, key):
     # Find the post with the given ID
@@ -132,11 +142,17 @@ def delete_post(id, key):
     return jsonify(post_dict), 200
 
 
-# Extension 1: Update post
+# Extension 2: Update post
 @app.route("/post/<int:id>/update/<string:key>", methods=["PUT"])
 def update_post(id, key):
     global flag
-    body = request.get_json(force=True)
+    if not request.is_json:
+        return "Request body should be in JSON format", 400
+    
+    body = request.get_json()
+    if "msg" not in body:
+        return "Request body should have a field called 'msg'", 400
+    
     msg = body['msg']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
@@ -178,18 +194,18 @@ def update_post(id, key):
         flag = False
         return jsonify(post_dict), 201
 
-
-# Extension 2: Threaded Replies
+    
+# Extension 3: Threaded Replies
 @app.route("/post/<int:id>", methods=["POST"])
 def threaded_replies(id):
     body = request.get_json(force=True)
     msg = body['msg']
     if not isinstance(msg, str) or msg is None:
         return "Post content should be of type string", 400
-        
+    
     # Generate a new ID for the post
     key = secrets.token_hex(16)
-
+    
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     
     max_id_doc = db["posts_collection"].find_one(sort=[("id", -1)])
@@ -198,17 +214,18 @@ def threaded_replies(id):
     else:
         max_id = max_id_doc["id"]
 
-    # Generate a new post_id by incrementing the maximum post_id
+    # Generate a new post_id by incrementing the maximum max_id
     reply_id = max_id + 1
+    
 
     reply = {
         "id": reply_id,
         "msg": msg,
         "key": key,
         "timestamp": timestamp,
-        # "parent_id": parent_post["id"],
         "thread": []
     }
+    
     # Insert the new post object into the database
     with lock:
         posts_collection = db["posts_collection"]
@@ -229,14 +246,14 @@ def threaded_replies(id):
     post_dict.pop("thread", None)
     return jsonify(post_dict), 200
 
-# Extension 3: Date and time based range queries
+
+# Extension 4: Date and time based range queries
 @app.route("/post/<string:start>/<string:end>", methods=['GET'])
 def date_time_queries(start, end):
     if start.lower() == "none":
         start = start.lower()
     if end.lower() == "none":
         end = end.lower()
-    # print(end)
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     with lock:
         posts_collection = db["posts_collection"]
@@ -257,6 +274,14 @@ def date_time_queries(start, end):
         result.append(post_dict)
 
     return jsonify(result), 200
+    
+    
+# Catch-All route
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    return jsonify({'error': 'Route Not found'}), 404
+
 
 if __name__ == "__main__":
     app.run()
